@@ -298,9 +298,16 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
         return false;
     }
 
-    // Start of an interpolated identifier: "#|".
+    // Start of an interpolated identifier: "$#|$".
     if ctx.leaf.kind() == SyntaxKind::Hash {
         ctx.from = ctx.cursor;
+        code_completions(ctx, true);
+        return true;
+    }
+
+    // Behind existing interpolated identifier: "$#pa|$".
+    if ctx.leaf.kind() == SyntaxKind::Ident {
+        ctx.from = ctx.leaf.offset();
         code_completions(ctx, true);
         return true;
     }
@@ -841,7 +848,9 @@ fn param_value_completions<'a>(
 /// Returns which file extensions to complete for the given parameter if any.
 fn path_completion(func: &Func, param: &ParamInfo) -> Option<&'static [&'static str]> {
     Some(match (func.name(), param.name) {
-        (Some("image"), "source") => &["png", "jpg", "jpeg", "gif", "svg", "svgz"],
+        (Some("image"), "source") => {
+            &["png", "jpg", "jpeg", "gif", "svg", "svgz", "webp"]
+        }
         (Some("csv"), "source") => &["csv"],
         (Some("plugin"), "source") => &["wasm"],
         (Some("cbor"), "source") => &["cbor"],
@@ -1664,6 +1673,13 @@ mod tests {
         test("#{() .a}", -2).must_include(["at", "any", "all"]);
     }
 
+    /// Test that autocomplete in math uses the correct global scope.
+    #[test]
+    fn test_autocomplete_math_scope() {
+        test("$#col$", -2).must_include(["colbreak"]).must_exclude(["colon"]);
+        test("$col$", -2).must_include(["colon"]).must_exclude(["colbreak"]);
+    }
+
     /// Test that the `before_window` doesn't slice into invalid byte
     /// boundaries.
     #[test]
@@ -1682,7 +1698,7 @@ mod tests {
 
         // Then, add the invalid `#cite` call. Had the document been invalid
         // initially, we would have no populated document to autocomplete with.
-        let end = world.main.len_bytes();
+        let end = world.main.text().len();
         world.main.edit(end..end, " #cite()");
 
         test_with_doc(&world, -2, doc.as_ref())
