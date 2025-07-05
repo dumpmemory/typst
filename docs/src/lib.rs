@@ -37,7 +37,7 @@ static GROUPS: LazyLock<Vec<GroupData>> = LazyLock::new(|| {
     let mut groups: Vec<GroupData> =
         yaml::from_str(load!("reference/groups.yml")).unwrap();
     for group in &mut groups {
-        if group.filter.is_empty() {
+        if group.filter.is_empty() && group.name != "std" {
             group.filter = group
                 .module()
                 .scope()
@@ -622,7 +622,7 @@ fn group_page(
     });
 
     let model = PageModel {
-        route: eco_format!("{parent}{}", group.name),
+        route: eco_format!("{parent}{}/", group.name),
         title: group.title.clone(),
         description: eco_format!("Documentation for the {} functions.", group.name),
         part: None,
@@ -712,26 +712,20 @@ fn symbols_model(resolver: &dyn Resolver, group: &GroupData) -> SymbolsModel {
     let mut list = vec![];
     for (name, binding) in group.module().scope().iter() {
         let Value::Symbol(symbol) = binding.read() else { continue };
-        let complete = |variant: &str| {
+        let complete = |variant: codex::ModifierSet<&str>| {
             if variant.is_empty() {
                 name.clone()
             } else {
-                eco_format!("{}.{}", name, variant)
+                eco_format!("{}.{}", name, variant.as_str())
             }
         };
 
-        for (variant, c) in symbol.variants() {
+        for (variant, c, deprecation) in symbol.variants() {
             let shorthand = |list: &[(&'static str, char)]| {
                 list.iter().copied().find(|&(_, x)| x == c).map(|(s, _)| s)
             };
 
             let name = complete(variant);
-            let deprecation = match name.as_str() {
-                "integral.sect" => {
-                    Some("`integral.sect` is deprecated, use `integral.inter` instead")
-                }
-                _ => binding.deprecation(),
-            };
 
             list.push(SymbolModel {
                 name,
@@ -742,10 +736,10 @@ fn symbols_model(resolver: &dyn Resolver, group: &GroupData) -> SymbolsModel {
                 accent: typst::math::Accent::combine(c).is_some(),
                 alternates: symbol
                     .variants()
-                    .filter(|(other, _)| other != &variant)
-                    .map(|(other, _)| complete(other))
+                    .filter(|(other, _, _)| other != &variant)
+                    .map(|(other, _, _)| complete(other))
                     .collect(),
-                deprecation,
+                deprecation: deprecation.or_else(|| binding.deprecation()),
             });
         }
     }

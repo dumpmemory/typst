@@ -9,6 +9,7 @@ mod prepare;
 mod shaping;
 
 pub use self::box_::layout_box;
+pub use self::shaping::create_shape_plan;
 
 use comemo::{Track, Tracked, TrackedMut};
 use typst_library::diag::SourceResult;
@@ -28,7 +29,7 @@ use typst_utils::{Numeric, SliceExt};
 use self::collect::{collect, Item, Segment, SpanMapper};
 use self::deco::decorate;
 use self::finalize::finalize;
-use self::line::{apply_baseline_shift, commit, line, Line};
+use self::line::{apply_shift, commit, line, Line};
 use self::linebreak::{linebreak, Breakpoint};
 use self::prepare::{prepare, Preparation};
 use self::shaping::{
